@@ -211,9 +211,13 @@ const getModelIconName = (icon: string) => {
   return 'cafe'; // Fallback
 };
 
-const createPillHTML = (business: BusinessPin, owned = false, showModel = false, zoom = 15) => {
-  const c = owned ? '#22C55E' : tierColors[business.tier];
+const createPillHTML = (business: BusinessPin, owned = false, showModel = false, zoom = 15, globalOwnerName?: string) => {
+  const isGloballyOwned = !owned && !!globalOwnerName;
+  const c = owned ? '#22C55E' : (isGloballyOwned ? '#94A3B8' : tierColors[business.tier]);
+  
   const crownBadge = owned ? `<div style="position:absolute;top:-8px;right:-4px;font-size:12px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));">👑</div>` : '';
+  const avatarBadge = isGloballyOwned ? `<div style="position:absolute;top:-8px;right:-6px;font-size:8px;font-weight:black;background:#334155;color:white;border-radius:10px;padding:2px 4px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 2px 4px rgba(0,0,0,0.2);display:flex;align-items:center;gap:2px;">👾 ${globalOwnerName?.substring(0,2).toUpperCase()}</div>` : '';
+  
   const glowStyle = owned ? 'box-shadow:0 0 12px rgba(34,197,94,0.5);' : '';
 
   // Calculate dynamic size for the 3D model based on map zoom
@@ -235,10 +239,11 @@ const createPillHTML = (business: BusinessPin, owned = false, showModel = false,
   return `
     <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:auto;">
       ${modelDiv}
-      <div class="marker-pill" style="position:relative;display:${pillDisplay};align-items:center;background:rgba(255,255,255,0.95);backdrop-filter:blur(4px);padding:3px 8px 3px 3px;border-radius:20px;${glowStyle}cursor:pointer;pointer-events:auto;border:1.5px solid ${c}${owned ? '' : '40'};transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <div class="marker-pill" style="position:relative;display:${pillDisplay};align-items:center;background:rgba(255,255,255,${isGloballyOwned ? '0.7' : '0.95'});backdrop-filter:blur(4px);padding:3px 8px 3px 3px;border-radius:20px;${glowStyle}cursor:pointer;pointer-events:auto;border:1.5px solid ${c}${owned ? '' : '40'};transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
         ${crownBadge}
-        <div style="width:24px;height:24px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-size:12px;margin-right:6px;flex-shrink:0;">${business.icon}</div>
-        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:${owned ? '#15803D' : '#334155'};letter-spacing:-0.2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${business.name}</span>
+        ${avatarBadge}
+        <div style="width:24px;height:24px;border-radius:50%;background:${c}${isGloballyOwned ? '60' : ''};display:flex;align-items:center;justify-content:center;font-size:12px;margin-right:6px;flex-shrink:0;">${isGloballyOwned ? '🔒' : business.icon}</div>
+        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:${owned ? '#15803D' : (isGloballyOwned ? '#64748B' : '#334155')};letter-spacing:-0.2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${business.name}</span>
       </div>
     </div>
   `;
@@ -270,6 +275,23 @@ const MapScreen = () => {
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestBusinessName, setGuestBusinessName] = useState("");
   const [guestOwner, setGuestOwner] = useState<string | null>(null);
+  const [globalClaims, setGlobalClaims] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch('/api/global-claims')
+      .then(res => res.json())
+      .then(data => setGlobalClaims(data))
+      .catch(console.error);
+  }, []);
+
+  // Force map markers to rerender when globalClaims are loaded
+  useEffect(() => {
+    if (mapRef.current && mapRef.current.isStyleLoaded()) {
+      // Just emit a small move event or directly call update? We can't call updatePOIMarkers directly 
+      // because it's defined lower down. We will just zoom in and out unnoticeably to trigger the map events.
+      mapRef.current.zoomTo(mapRef.current.getZoom() + 0.0001, { duration: 0 });
+    }
+  }, [globalClaims]);
 
   // Cleanup GPS watcher on unmount to prevent massive battery drain
   useEffect(() => {
@@ -459,8 +481,10 @@ const MapScreen = () => {
         html = createIconHTML(biz.icon, biz.tier);
         zoomType = 'icon';
       } else {
-        html = createPillHTML(biz, false, false, zoom);
-        zoomType = 'pill';
+        const globalOwner = globalClaims[biz.name.toLowerCase()];
+        html = createPillHTML(biz, false, false, zoom, globalOwner);
+        // Vary the zoom type identifier so markers rerender when data fetches
+        zoomType = `pill-${globalOwner ? 'claimed' : 'unclaimed'}`;
       }
 
       if (existingMarker) {
@@ -520,7 +544,7 @@ const MapScreen = () => {
         .addTo(map);
       existingMarkers.set(biz.id, marker);
     });
-  }, [isOwned]);
+  }, [isOwned, globalClaims]);
 
   /* ---------------------------------------------------------------- */
   /*  Initialize the map                                               */

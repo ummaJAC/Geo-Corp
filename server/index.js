@@ -299,6 +299,33 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
+// Global claims for map visualization
+app.get('/api/global-claims', async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('businesses')
+            .select(`
+                name,
+                user_id,
+                profiles:user_id (username)
+            `);
+            
+        if (error || !data) return res.json({});
+        
+        const claims = {};
+        data.forEach(b => {
+            const username = b.profiles ? (Array.isArray(b.profiles) ? b.profiles[0]?.username : b.profiles.username) : null;
+            if (b.name && username) {
+                claims[b.name.toLowerCase()] = username;
+            }
+        });
+        
+        res.json(claims);
+    } catch {
+        res.json({});
+    }
+});
+
 // Quick ownership check (called before opening camera)
 app.get('/api/check-ownership', async (req, res) => {
     try {
@@ -827,4 +854,17 @@ app.listen(port, () => {
     console.log(`⛓️  Flow EVM Testnet | Contract: ${CONTRACT_ADDRESS}`);
     console.log(`📦 IPFS: Pinata ${process.env.PINATA_JWT ? '✅ Connected' : '❌ Not configured'}`);
     console.log(`🔗 Flowscan: https://evm-testnet.flowscan.io/address/${CONTRACT_ADDRESS}\n`);
+});
+
+// Forcibly keep event loop alive and catch any hidden errors causing silent exits
+setInterval(() => {}, 60000);
+
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNHANDLED REJECTION:', reason);
+});
+process.on('exit', (code) => {
+    console.log(`Process exiting with code: ${code}`);
 });
