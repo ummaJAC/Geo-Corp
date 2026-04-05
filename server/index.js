@@ -309,8 +309,6 @@ app.get('/api/check-ownership', async (req, res) => {
             .from('businesses')
             .select('user_id')
             .eq('name', name)
-            .eq('lat', parseFloat(lat))
-            .eq('lng', parseFloat(lng))
             .limit(1);
 
         if (existing && existing.length > 0) {

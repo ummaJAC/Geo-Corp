@@ -93,7 +93,7 @@ const WorldMap = () => {
 
 const OnboardingScreen = () => {
   const navigate = useNavigate();
-  const { login, token, user } = useGameStore();
+  const { login, token, user, enterGuestMode } = useGameStore();
   const [isLoading, setIsLoading] = useState(false);
   
   const [initialToken] = useState(token);
@@ -303,7 +303,25 @@ const OnboardingScreen = () => {
                       <Mail size={18} />
                       Continue with Email
                     </button>
-            
+
+                    {/* Guest Mode divider */}
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="flex-1 h-px" style={{ background: "hsl(0 0% 100% / 0.06)" }} />
+                      <span className="text-[11px] text-muted-foreground">or</span>
+                      <div className="flex-1 h-px" style={{ background: "hsl(0 0% 100% / 0.06)" }} />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        enterGuestMode();
+                        navigate("/map");
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl py-[13px] text-muted-foreground font-medium text-[14px] transition-all duration-200 active:scale-[0.98] hover:text-foreground"
+                      style={{ border: "1px dashed hsl(0 0% 100% / 0.1)" }}
+                    >
+                      🗺️ Explore the map as Guest
+                    </button>
+
                     <p className="pt-5 text-center text-[11px] text-muted-foreground leading-relaxed">
                       By signing in, a secure blockchain wallet is
                       <br />

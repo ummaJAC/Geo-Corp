@@ -264,8 +264,12 @@ const MapScreen = () => {
   const ownedLocations = useGameStore(s => s.ownedLocations);
   const lastKnownLocation = useGameStore(s => s.lastKnownLocation);
   const setLastKnownLocation = useGameStore(s => s.setLastKnownLocation);
+  const isGuest = useGameStore(s => s.isGuest);
   const [isZoomedOut, setIsZoomedOut] = useState(false);
   const [checkingOwnership, setCheckingOwnership] = useState(false);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestBusinessName, setGuestBusinessName] = useState("");
+  const [guestOwner, setGuestOwner] = useState<string | null>(null);
 
   // Cleanup GPS watcher on unmount to prevent massive battery drain
   useEffect(() => {
@@ -772,6 +776,20 @@ const MapScreen = () => {
                     disabled={checkingOwnership}
                     onClick={async () => {
                       if (!selectedBusiness) return;
+                      // Guest mode — check ownership first, then show sign-up prompt
+                      if (isGuest) {
+                        setGuestBusinessName(selectedBusiness.name);
+                        setCheckingOwnership(true);
+                        try {
+                          const res = await fetch(`/api/check-ownership?name=${encodeURIComponent(selectedBusiness.name)}&lat=${selectedBusiness.lat}&lng=${selectedBusiness.lng}`);
+                          const data = await res.json();
+                          setGuestOwner(data.owned ? data.owner : null);
+                        } catch { setGuestOwner(null); }
+                        setCheckingOwnership(false);
+                        setShowGuestModal(true);
+                        setSelectedBusiness(null);
+                        return;
+                      }
                       setCheckingOwnership(true);
                       try {
                         const res = await fetch(`/api/check-ownership?name=${encodeURIComponent(selectedBusiness.name)}&lat=${selectedBusiness.lat}&lng=${selectedBusiness.lng}`);
@@ -867,6 +885,70 @@ const MapScreen = () => {
       <div className="relative z-50">
         <BottomNav />
       </div>
+
+      {/* ===== Guest Mode Sign-Up Modal ===== */}
+      <AnimatePresence>
+        {showGuestModal && (
+          <motion.div
+            className="fixed inset-0 z-[200] flex items-center justify-center px-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => { setShowGuestModal(false); setSelectedBusiness(null); }}
+          >
+            {/* Solid opaque backdrop */}
+            <div className="absolute inset-0 bg-black/85" />
+
+            {/* Card */}
+            <motion.div
+              className="relative z-10 w-full max-w-sm rounded-3xl p-7 shadow-2xl"
+              style={{ background: "#ffffff" }}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="text-6xl mb-4">{guestOwner ? "🔒" : "🏢"}</div>
+                <h2 className="text-[22px] font-black text-slate-800 mb-2 leading-tight">
+                  {guestOwner ? `Claimed by ${guestOwner}` : "This spot is unclaimed!"}
+                </h2>
+                <p className="text-[14px] text-slate-500 leading-relaxed">
+                  {guestOwner ? (
+                    <>
+                      <span className="font-bold text-slate-800">{guestBusinessName}</span> is already generating{" "}
+                      <span className="text-green-600 font-bold">$GEO yield</span> for its owner.{" "}
+                      Sign up to find <span className="font-bold text-slate-800">unclaimed spots</span> nearby!
+                    </>
+                  ) : (
+                    <>
+                      Sign up in <span className="text-green-600 font-bold">5 seconds</span> to capture{" "}
+                      <span className="font-bold text-slate-800">{guestBusinessName}</span> and start earning passive{" "}
+                      <span className="text-green-600 font-bold">$GEO yield</span> from it forever.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <button
+                onClick={() => { setShowGuestModal(false); setSelectedBusiness(null); navigate("/"); }}
+                className="w-full rounded-2xl py-4 font-black text-[16px] uppercase tracking-wider text-white transition-all active:scale-[0.97]"
+                style={{ background: "#22c55e", boxShadow: "0 6px 0 #15803d" }}
+              >
+                Create Free Account →
+              </button>
+
+              <button
+                onClick={() => { setShowGuestModal(false); setSelectedBusiness(null); }}
+                className="mt-3 w-full py-3 text-[13px] text-slate-400 font-semibold"
+              >
+                Keep Exploring
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

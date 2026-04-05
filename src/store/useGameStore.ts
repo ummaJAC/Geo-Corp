@@ -82,8 +82,10 @@ interface GameState {
   // --- Auth ---
   user: User | null;
   token: string | null;
+  isGuest: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  enterGuestMode: () => void;
   fetchProfile: () => Promise<void>;
 
   // --- Owned locations ---
@@ -124,6 +126,7 @@ const useGameStore = create<GameState>()(
     (set, get) => ({
       user: null,
       token: null,
+      isGuest: false,
       ownedLocations: [],
       balance: 0,
       totalEarned: 0,
@@ -140,7 +143,11 @@ const useGameStore = create<GameState>()(
       },
 
       logout: () => {
-        set({ user: null, token: null, ownedLocations: [], balance: 0, totalEarned: 0, totalCaptures: 0, transactions: [], lastKnownLocation: null });
+        set({ user: null, token: null, isGuest: false, ownedLocations: [], balance: 0, totalEarned: 0, totalCaptures: 0, transactions: [], lastKnownLocation: null });
+      },
+
+      enterGuestMode: () => {
+        set({ isGuest: true, user: null, token: null });
       },
 
       setLastKnownLocation: (lat, lng) => set({ lastKnownLocation: { lat, lng } }),
